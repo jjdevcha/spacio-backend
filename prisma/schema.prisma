@@ -1,0 +1,125 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+
+enum UserRole {
+  USER 
+  HOST 
+  ADMIN
+}
+
+enum SpaceUnitType {
+  DESK
+  PRIVATE_ROOM
+  MEETING_ROOM
+}
+
+enum BookingStatus {
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model User {
+  id String @id @default(uuid())
+  email String @unique
+  passwordHash String
+  name String
+  role UserRole @default(USER)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  workspaces Workspace[]
+  bookings Booking[]
+}
+
+model Workspace {
+  id                 String    @id @default(uuid())
+  name               String
+  description        String
+  address            String
+  city               String
+  latitude           Float
+  longitude          Float
+  imageUrl           String?
+  cancellationPolicy String    @default("Free cancellation up to 24 hours before")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  
+  ownerId            String
+  owner              User      @relation(fields: [ownerId], references: [id])
+  
+  spaceUnits         SpaceUnit[]
+}
+
+model SpaceUnit {
+  id            String        @id @default(uuid())
+  type          SpaceUnitType
+  name          String       
+  capacity      Int
+  pricePerHour  Float
+  pricePerDay   Float
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  
+  workspaceId   String
+  workspace     Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  
+  availabilityRules AvailabilityRule[]
+  bookings          Booking[]
+  blockedTimes      BlockedTime[]
+}
+
+model AvailabilityRule {
+  id          String   @id @default(uuid())
+  dayOfWeek   Int      
+  startTime   String   
+  endTime     String   
+  
+  spaceUnitId String
+  spaceUnit   SpaceUnit @relation(fields: [spaceUnitId], references: [id], onDelete: Cascade)
+  
+  @@unique([spaceUnitId, dayOfWeek])
+}
+
+model Booking {
+  id          String        @id @default(uuid())
+  startTime   DateTime
+  endTime     DateTime
+  status      BookingStatus @default(CONFIRMED)
+  totalPrice  Float
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  
+  userId      String
+  user        User          @relation(fields: [userId], references: [id])
+  
+  spaceUnitId String
+  spaceUnit   SpaceUnit     @relation(fields: [spaceUnitId], references: [id])
+  
+  @@index([spaceUnitId, startTime, endTime])
+}
+
+model BlockedTime {
+  id          String    @id @default(uuid())
+  startTime   DateTime
+  endTime     DateTime
+  reason      String?
+  
+  spaceUnitId String
+  spaceUnit   SpaceUnit @relation(fields: [spaceUnitId], references: [id], onDelete: Cascade)
+}
+
+
